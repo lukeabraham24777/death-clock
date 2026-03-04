@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const fs=require\\(''fs''\\); const buf=fs.readFileSync\\(''C:/Users/likea/Desktop/Projects/deathClock/app/assets/icon.png''\\); console.log\\(''First 8 bytes \\(PNG signature\\):'', [...buf.slice\\(0,8\\)]\\); console.log\\(''Expected PNG signature:        [137, 80, 78, 71, 13, 10, 26, 10]''\\); console.log\\(''Valid PNG:'', buf[0]===137 && buf[1]===80 && buf[2]===78 && buf[3]===71\\);\")",
+      "Bash(xargs cat)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.expo.dev)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)"
+    ]
+  }
+}

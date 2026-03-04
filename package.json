@@ -1,0 +1,25 @@
+{
+  "name": "death-clock-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:prediction\" \"npm run dev:app\"",
+    "dev:app": "cd app && npm start",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:prediction": "cd prediction-service && python app.py",
+    "install:all": "cd app && npm install && cd ../backend && npm install && cd ../prediction-service && pip install -r requirements.txt",
+    "db:init": "cd backend && npm run db:init",
+    "build:ios": "cd app && npx eas build -p ios",
+    "build:android": "cd app && npx eas build -p android",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.10",
+    "concurrently": "^9.0.0",
+    "typescript": "~5.9.2"
+  },
+  "dependencies": {
+    "expo": "^55.0.4"
+  }
+}

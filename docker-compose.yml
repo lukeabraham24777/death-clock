@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: deathclock
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  # Node.js backend API
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/deathclock
+      PREDICTION_SERVICE_URL: http://prediction:5000
+      NODE_ENV: development
+    depends_on:
+      - db
+      - prediction
+
+  # Python prediction microservice
+  prediction:
+    build: ./prediction-service
+    ports:
+      - "5000:5000"
+
+volumes:
+  pgdata:
