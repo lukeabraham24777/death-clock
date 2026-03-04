@@ -67,11 +67,13 @@ export interface BloodTestData {
 
 // Navigation types
 export type RootStackParamList = {
+  Splash: undefined;
   Landing: undefined;
   Questionnaire: undefined;
   Calculation: { responses: UserResponse[] };
   Reveal: { prediction: PredictionResult };
   Dashboard: { prediction: PredictionResult };
   Share: { prediction: PredictionResult };
+  InsightDetail: { insight: LongevityInsight };
   BloodTest: { userId: string };
 };

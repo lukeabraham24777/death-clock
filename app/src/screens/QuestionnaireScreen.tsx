@@ -11,6 +11,7 @@ import {
   ScrollView,
   Keyboard,
   KeyboardAvoidingView,
+  Easing,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../theme';
@@ -20,6 +21,19 @@ import ProgressBar from '../components/ProgressBar';
 import MicroReward from '../components/MicroReward';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Questionnaire'>;
+
+// Generate fake poll percentages that sum to 100%
+function generateFakePolls(optionCount: number): number[] {
+  if (optionCount <= 0) return [];
+  // Generate random weights, then normalize to 100
+  const raw = Array.from({ length: optionCount }, () => Math.random() * 40 + 5);
+  const sum = raw.reduce((a, b) => a + b, 0);
+  const percentages = raw.map((v) => Math.round((v / sum) * 100));
+  // Fix rounding error on last item
+  const diff = 100 - percentages.reduce((a, b) => a + b, 0);
+  percentages[percentages.length - 1] += diff;
+  return percentages;
+}
 
 const { width } = Dimensions.get('window');
 
@@ -60,6 +74,8 @@ export default function QuestionnaireScreen({ navigation }: Props) {
   const [showReward, setShowReward] = useState(false);
   const [rewardMessage, setRewardMessage] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [pollPercentages, setPollPercentages] = useState<number[]>([]);
+  const [showPolls, setShowPolls] = useState(false);
 
   // Refs
   const autoAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,6 +83,8 @@ export default function QuestionnaireScreen({ navigation }: Props) {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const optionScaleAnims = useRef<Animated.Value[]>([]);
+  const pendulumAnim = useRef(new Animated.Value(0)).current;
+  const pollFadeAnim = useRef(new Animated.Value(0)).current;
 
   const question = questions[currentIndex];
   const progress = (currentIndex + 1) / questions.length;
@@ -85,6 +103,25 @@ export default function QuestionnaireScreen({ navigation }: Props) {
       setSliderValue(Math.round((min + max) / 2));
     }
   }, [currentIndex, question]);
+
+  // Pendulum swing animation - single continuous linear cycle
+  // Uses sine-wave interpolation so pendulum is slowest at peaks, fastest at center (gravity)
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(pendulumAnim, {
+        toValue: 1,
+        duration: 3200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  // Reset polls when question changes
+  useEffect(() => {
+    setShowPolls(false);
+    pollFadeAnim.setValue(0);
+  }, [currentIndex]);
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -151,7 +188,21 @@ export default function QuestionnaireScreen({ navigation }: Props) {
         impact = sv > 10 ? -2 : sv > 6 ? -1 : 1;
       }
     } else if (question.type === 'date') {
-      answer = dateValue;
+      // If overrideAnswer is provided (pre-computed YYYY-MM-DD from handleTextChange), use it
+      if (overrideAnswer) {
+        answer = overrideAnswer;
+      } else {
+        // Fallback: convert MM-DD-YYYY display format to YYYY-MM-DD
+        const digits = dateValue.replace(/\D/g, '');
+        if (digits.length >= 8) {
+          const mm = digits.slice(0, 2);
+          const dd = digits.slice(2, 4);
+          const yyyy = digits.slice(4, 8);
+          answer = `${yyyy}-${mm}-${dd}`;
+        } else {
+          answer = dateValue;
+        }
+      }
       impact = 0;
     }
 
@@ -190,6 +241,34 @@ export default function QuestionnaireScreen({ navigation }: Props) {
     if (isTransitioning) return;
     setSelectedOption(value);
 
+    // Show fake poll percentages
+    const optCount = question.options?.length ?? 0;
+    if (optCount > 0) {
+      const polls = generateFakePolls(optCount);
+      // Boost the selected option's percentage slightly for realism
+      const boost = Math.floor(Math.random() * 10) + 5;
+      polls[index] += boost;
+      // Reduce others proportionally
+      const totalOther = polls.reduce((s, v, i) => i !== index ? s + v : s, 0);
+      if (totalOther > 0) {
+        for (let i = 0; i < polls.length; i++) {
+          if (i !== index) {
+            polls[i] = Math.max(1, Math.round(polls[i] - (boost * polls[i] / totalOther)));
+          }
+        }
+      }
+      // Fix to 100%
+      const sum = polls.reduce((a, b) => a + b, 0);
+      polls[index] += (100 - sum);
+      setPollPercentages(polls);
+      setShowPolls(true);
+      Animated.timing(pollFadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+
     // Quick pop animation on the selected option
     if (optionScaleAnims.current[index]) {
       Animated.sequence([
@@ -206,7 +285,7 @@ export default function QuestionnaireScreen({ navigation }: Props) {
     autoAdvanceTimer.current = setTimeout(() => {
       recordAndAdvance(value, impact);
     }, AUTO_ADVANCE_DELAY);
-  }, [isTransitioning, recordAndAdvance]);
+  }, [isTransitioning, recordAndAdvance, question]);
 
   // ---- AUTO-ADVANCE: SLIDER ----
   const handleSliderSelect = useCallback((value: number) => {
@@ -223,21 +302,23 @@ export default function QuestionnaireScreen({ navigation }: Props) {
     if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current);
 
     if (question.type === 'date') {
-      // Auto-format: insert dashes as user types digits
+      // Auto-format MM-DD-YYYY: insert dashes as user types digits
       const digits = text.replace(/\D/g, '');
       let formatted = digits;
-      if (digits.length > 4) formatted = digits.slice(0, 4) + '-' + digits.slice(4);
-      if (digits.length > 6) formatted = digits.slice(0, 4) + '-' + digits.slice(4, 6) + '-' + digits.slice(6, 8);
+      if (digits.length > 2) formatted = digits.slice(0, 2) + '-' + digits.slice(2);
+      if (digits.length > 4) formatted = digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4, 8);
       setDateValue(formatted);
 
-      // Auto-advance when full valid date entered
+      // Auto-advance when full valid date entered (MM-DD-YYYY)
       if (digits.length >= 8) {
-        const year = parseInt(digits.slice(0, 4), 10);
-        const month = parseInt(digits.slice(4, 6), 10);
-        const day = parseInt(digits.slice(6, 8), 10);
+        const month = parseInt(digits.slice(0, 2), 10);
+        const day = parseInt(digits.slice(2, 4), 10);
+        const year = parseInt(digits.slice(4, 8), 10);
         if (year >= 1900 && year <= 2010 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          // Pre-compute YYYY-MM-DD and pass directly to avoid stale closure
+          const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           Keyboard.dismiss();
-          autoAdvanceTimer.current = setTimeout(() => recordAndAdvance(), AUTO_ADVANCE_DELAY);
+          autoAdvanceTimer.current = setTimeout(() => recordAndAdvance(isoDate, 0), AUTO_ADVANCE_DELAY);
         }
       }
     } else if (question.type === 'number') {
@@ -396,6 +477,7 @@ export default function QuestionnaireScreen({ navigation }: Props) {
             {question.type === 'single' && question.options?.map((option, idx) => {
               const isSelected = selectedOption === option.value;
               const scaleAnim = optionScaleAnims.current[idx];
+              const pollPct = showPolls && pollPercentages[idx] != null ? pollPercentages[idx] : null;
               return (
                 <Animated.View
                   key={option.value}
@@ -405,23 +487,48 @@ export default function QuestionnaireScreen({ navigation }: Props) {
                     style={[styles.optionBtn, isSelected && styles.optionBtnSelected]}
                     onPress={() => handleOptionSelect(option.value, option.impact, idx)}
                     activeOpacity={0.7}
-                    disabled={isTransitioning}
+                    disabled={isTransitioning || showPolls}
                   >
+                    {/* Poll fill bar behind the option */}
+                    {pollPct !== null && (
+                      <Animated.View
+                        style={[
+                          styles.pollFillBar,
+                          {
+                            width: `${pollPct}%`,
+                            opacity: pollFadeAnim,
+                            backgroundColor: isSelected
+                              ? 'rgba(0, 212, 255, 0.15)'
+                              : 'rgba(255, 255, 255, 0.04)',
+                          },
+                        ]}
+                      />
+                    )}
                     <View style={[styles.radio, isSelected && styles.radioSelected]}>
                       {isSelected && <View style={styles.radioDot} />}
                     </View>
                     <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
                       {option.label}
                     </Text>
-                    {isSelected && (
+                    {pollPct !== null ? (
+                      <Animated.Text style={[styles.pollText, { opacity: pollFadeAnim }]}>
+                        {pollPct}%
+                      </Animated.Text>
+                    ) : isSelected ? (
                       <View style={styles.checkCircle}>
                         <Text style={styles.checkMark}>✓</Text>
                       </View>
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                 </Animated.View>
               );
             })}
+            {/* "Others selected" label when polls visible */}
+            {showPolls && question.type === 'single' && (
+              <Animated.Text style={[styles.pollLabel, { opacity: pollFadeAnim }]}>
+                Based on other users' responses
+              </Animated.Text>
+            )}
 
             {question.type === 'number' && (
               <View style={styles.textInputWrap}>
@@ -453,12 +560,12 @@ export default function QuestionnaireScreen({ navigation }: Props) {
                   value={dateValue}
                   onChangeText={handleTextChange}
                   keyboardType="number-pad"
-                  placeholder="YYYYMMDD"
+                  placeholder="MMDDYYYY"
                   placeholderTextColor={theme.colors.textDim}
                   maxLength={10}
                   autoFocus
                 />
-                <Text style={styles.inputHint}>Type your birth date digits</Text>
+                <Text style={styles.inputHint}>Enter as MM-DD-YYYY</Text>
               </View>
             )}
           </View>
@@ -468,6 +575,53 @@ export default function QuestionnaireScreen({ navigation }: Props) {
           )}
         </Animated.View>
       </ScrollView>
+
+      {/* Swinging hourglass pendulum at bottom */}
+      <View style={styles.pendulumContainer}>
+        <View style={styles.pendulumLine} />
+        <Animated.View
+          style={[
+            styles.pendulumArm,
+            {
+              transform: [
+                {
+                  // Sine-wave interpolation: 20 sample points around sin(2πt) * 30°
+                  // Naturally slow at peaks (gravity), fast through center
+                  rotate: pendulumAnim.interpolate({
+                    inputRange: [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1],
+                    outputRange: [
+                      '0deg',    // sin(0) = 0
+                      '9.3deg',  // sin(0.314) ≈ 0.309
+                      '17.6deg', // sin(0.628) ≈ 0.588
+                      '24deg',   // sin(0.942) ≈ 0.809
+                      '27.8deg', // sin(1.257) ≈ 0.951
+                      '28deg',   // sin(1.571) = 1.0 (peak)
+                      '24.8deg', // sin(1.885) ≈ 0.951 (descending)
+                      '18.5deg',
+                      '10.5deg',
+                      '2.8deg',
+                      '0deg',    // sin(π) = 0 (center)
+                      '-9.3deg',
+                      '-17.6deg',
+                      '-24deg',
+                      '-27.8deg',
+                      '-28deg',  // sin(4.712) = -1.0 (opposite peak)
+                      '-24.8deg',
+                      '-18.5deg',
+                      '-10.5deg',
+                      '-2.8deg',
+                      '0deg',    // sin(2π) = 0 (seamless loop)
+                    ],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.pendulumString} />
+          <Text style={styles.pendulumIcon}>⏳</Text>
+        </Animated.View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -717,5 +871,55 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     marginTop: theme.spacing.xl,
     letterSpacing: 1,
+  },
+
+  // Poll percentages
+  pollFillBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: theme.borderRadius.md,
+  },
+  pollText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.primary,
+    fontWeight: '700',
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  pollLabel: {
+    textAlign: 'center',
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.textDim,
+    marginTop: theme.spacing.sm,
+    fontStyle: 'italic',
+  },
+
+  // Pendulum
+  pendulumContainer: {
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
+  pendulumLine: {
+    width: 1,
+    height: 0,
+    backgroundColor: theme.colors.border,
+  },
+  pendulumArm: {
+    alignItems: 'center',
+    // Pivot from top center
+    transformOrigin: 'top center',
+  },
+  pendulumString: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(0, 212, 255, 0.3)',
+  },
+  pendulumIcon: {
+    fontSize: 32,
+    marginTop: -4,
   },
 });
