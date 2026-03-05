@@ -207,57 +207,90 @@ export function calculateLocalPrediction(
   };
 }
 
-// Generate longevity improvement insights from user responses
+// Generate ALL longevity insights — both negative (needs improvement) and positive (well done)
 function generateInsights(responses: UserResponse[]): PredictionResult['insights'] {
-  const insightMap: Record<string, { title: string; description: string; category: string }> = {
+  const insightMap: Record<string, {
+    title: string;
+    description: string;
+    category: string;
+    positiveDesc: string; // shown when user is already doing well
+  }> = {
     smoking: {
       category: 'Habits',
       title: 'Quit Smoking',
       description: 'Quitting smoking can add up to 10 years to your life. It\'s never too late to quit.',
+      positiveDesc: 'You don\'t smoke — this alone adds years to your life. Keep it up!',
     },
     exercise_frequency: {
       category: 'Exercise',
       title: 'Move More',
       description: 'Regular exercise reduces risk of heart disease, cancer, and mental decline.',
+      positiveDesc: 'Your exercise routine is adding years to your life. Stay active!',
     },
     sleep_hours: {
       category: 'Sleep',
       title: 'Optimize Sleep',
       description: '7-9 hours of quality sleep is linked to longer lifespan and better health.',
+      positiveDesc: 'Your sleep habits are excellent — your body thanks you every night.',
     },
     diet_quality: {
       category: 'Diet',
       title: 'Eat Better',
       description: 'A whole-food diet rich in plants can add years to your life.',
+      positiveDesc: 'Your healthy diet is one of the best investments in longevity. Well done!',
     },
     stress_level: {
       category: 'Mental Health',
       title: 'Manage Stress',
       description: 'Chronic stress accelerates aging. Meditation and exercise can help.',
+      positiveDesc: 'Your low stress levels protect your telomeres and keep you young. Keep it calm!',
     },
     relationships: {
       category: 'Social',
       title: 'Build Connections',
       description: 'Strong social bonds are the #1 predictor of longevity in research.',
+      positiveDesc: 'Your strong social bonds are the #1 predictor of a long life. Cherish them!',
     },
     alcohol: {
       category: 'Habits',
       title: 'Moderate Alcohol',
       description: 'Reducing alcohol intake protects your liver, heart, and brain.',
+      positiveDesc: 'Your moderate alcohol habits protect your liver, heart, and brain. Smart choice!',
     },
     water_intake: {
       category: 'Diet',
       title: 'Stay Hydrated',
       description: 'Proper hydration supports every system in your body.',
+      positiveDesc: 'Great hydration habits! Every cell in your body benefits from this.',
     },
   };
 
-  return responses
-    .filter((r) => r.impact < 0 && insightMap[r.questionId])
-    .map((r) => ({
-      ...insightMap[r.questionId],
-      impact: 'negative' as const,
-      yearsImpact: r.impact,
-    }))
-    .slice(0, 5); // Top 5 actionable insights
+  const results: PredictionResult['insights'] = [];
+
+  // First add all negative-impact insights (needs improvement)
+  for (const r of responses) {
+    if (r.impact < 0 && insightMap[r.questionId]) {
+      results.push({
+        ...insightMap[r.questionId],
+        impact: 'negative' as const,
+        yearsImpact: r.impact,
+      });
+    }
+  }
+
+  // Then add positive/neutral insights (well done) for remaining categories
+  for (const r of responses) {
+    if (r.impact >= 0 && insightMap[r.questionId]) {
+      const entry = insightMap[r.questionId];
+      results.push({
+        category: entry.category,
+        title: entry.title,
+        description: entry.positiveDesc,
+        impact: 'positive' as const,
+        yearsImpact: r.impact,
+      });
+    }
+  }
+
+  return results.slice(0, 8); // Show up to 8 insights
 }

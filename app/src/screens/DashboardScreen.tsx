@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,21 @@ import {
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Audio } from 'expo-av';
 import { theme } from '../theme';
 import { RootStackParamList } from '../types';
 import CountdownTimer from '../components/CountdownTimer';
 
+// Plague doctor image — replace placeholder with your actual image at this path
+const plagueDoctorImg = require('../../assets/plague-doctor.png');
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 48; // padding on both sides
+const CARD_WIDTH = SCREEN_WIDTH - 48;
 const CARD_SPACING = 12;
 
 export default function DashboardScreen({ navigation, route }: Props) {
@@ -27,11 +32,9 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const [activeCard, setActiveCard] = React.useState(0);
 
-  // Compute death age
-  const birthDateResp = deathDate; // death date is already computed
   const deathAge = prediction.predictedLifespan;
 
-  // "Improved" death date: add 18 years, 2 months, 3 days to current death date
+  // "Improved" death date: add 18 years, 2 months, 3 days
   const improvedDate = new Date(deathDate.getTime());
   improvedDate.setFullYear(improvedDate.getFullYear() + 18);
   improvedDate.setMonth(improvedDate.getMonth() + 2);
@@ -53,7 +56,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
       ? theme.colors.warning
       : theme.colors.danger;
 
-  // Handle carousel scroll
+
+  // Carousel scroll handler
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
     const idx = Math.round(x / (CARD_WIDTH + CARD_SPACING));
@@ -64,41 +68,37 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const cards = [
     {
       key: 'death',
-      topIcon: '💀',
       topLabel: 'MEMENTO MORI',
       mainText: 'Save the date:',
       emphasis: `You are going to die\n${formatDateLong(deathDate)}`,
       bottomText: `at age ${deathAge}`,
       borderColor: '#FF4444',
-      glowColor: 'rgba(255, 68, 68, 0.08)',
+      glowColor: 'rgba(255, 68, 68, 0.06)',
       accentColor: '#FF4444',
     },
     {
       key: 'live',
-      topIcon: '✨',
       topLabel: 'MEMENTO VIVERE',
       mainText: 'Save the date:',
       emphasis: `You are going to live\nuntil ${formatDateLong(improvedDate)}`,
       bottomText: `to age ${improvedAge} by improving your lifestyle`,
       borderColor: theme.colors.success,
-      glowColor: 'rgba(0, 255, 136, 0.06)',
+      glowColor: 'rgba(0, 255, 136, 0.04)',
       accentColor: theme.colors.success,
     },
     {
       key: 'stats',
-      topIcon: '⏳',
       topLabel: 'YOUR REMAINING TIME',
       mainText: '',
       emphasis: '',
       bottomText: '',
       borderColor: theme.colors.primary,
-      glowColor: 'rgba(0, 212, 255, 0.06)',
+      glowColor: 'rgba(0, 212, 255, 0.04)',
       accentColor: theme.colors.primary,
       isStats: true,
     },
     {
       key: 'score',
-      topIcon: '🩺',
       topLabel: 'THE DOCTOR\'S VERDICT',
       mainText: 'Longevity Score',
       emphasis: `${prediction.longevityScore}`,
@@ -114,20 +114,23 @@ export default function DashboardScreen({ navigation, route }: Props) {
     },
   ];
 
+  // Roman numerals for insight numbering
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+
   return (
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header - plague doctor themed */}
+        {/* Header with plague doctor image */}
         <View style={styles.headerSection}>
-          <Text style={styles.plagueIcon}>🦠</Text>
+          <Image source={plagueDoctorImg} style={styles.headerImage} resizeMode="contain" />
           <Text style={styles.headerTitle}>THE DEATH CLOCK</Text>
           <Text style={styles.headerSubtitle}>Your fate has been sealed</Text>
         </View>
 
-        {/* Live countdown timer - prominent */}
+        {/* Live countdown timer */}
         <View style={styles.countdownSection}>
           <View style={styles.countdownBorder}>
             <View style={styles.countdownInner}>
@@ -144,7 +147,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Swipeable photo cards carousel */}
+        {/* Swipeable photo cards */}
         <View style={styles.carouselSection}>
           <Text style={styles.carouselLabel}>SWIPE TO REVEAL YOUR FATE</Text>
           <ScrollView
@@ -171,10 +174,10 @@ export default function DashboardScreen({ navigation, route }: Props) {
                   },
                 ]}
               >
-                {/* Ornate top */}
+                {/* Ornate top with plague doctor image */}
                 <View style={styles.cardOrnateTop}>
                   <View style={[styles.ornamentLine, { backgroundColor: card.accentColor }]} />
-                  <Text style={styles.cardTopIcon}>{card.topIcon}</Text>
+                  <Image source={plagueDoctorImg} style={styles.cardDoctorImg} resizeMode="contain" />
                   <View style={[styles.ornamentLine, { backgroundColor: card.accentColor }]} />
                 </View>
 
@@ -220,7 +223,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
                     </Text>
                   </View>
                 ) : card.isScore ? (
-                  /* Score card variant */
                   <View style={styles.scoreCardBody}>
                     <Text style={styles.cardMainText}>{card.mainText}</Text>
                     <Text style={[styles.scoreNumber, { color: card.accentColor }]}>
@@ -238,7 +240,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
                     <Text style={styles.cardCaption}>{card.bottomText}</Text>
                   </View>
                 ) : (
-                  /* Standard "save the date" cards */
                   <View style={styles.cardBody}>
                     <Text style={styles.cardMainText}>{card.mainText}</Text>
                     <Text style={[styles.cardEmphasis, { color: card.accentColor }]}>
@@ -275,11 +276,11 @@ export default function DashboardScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Longevity insights - tappable, plague themed */}
+        {/* Longevity insights — ALL tips, positive ones marked as "Well Done" */}
         {prediction.insights.length > 0 && (
           <View style={styles.insightsSection}>
             <View style={styles.insightsSectionHeader}>
-              <Text style={styles.insightsIcon}>🧪</Text>
+              <Image source={plagueDoctorImg} style={styles.insightsDoctorImg} resizeMode="contain" />
               <View>
                 <Text style={styles.insightsTitle}>THE DOCTOR'S PRESCRIPTIONS</Text>
                 <Text style={styles.insightsSubtitle}>
@@ -287,57 +288,81 @@ export default function DashboardScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
-            {prediction.insights.map((insight, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.insightCard}
-                onPress={() => navigation.navigate('InsightDetail', { insight })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.insightLeft}>
-                  <Text style={styles.insightRoman}>
-                    {['I', 'II', 'III', 'IV', 'V'][index] ?? String(index + 1)}
-                  </Text>
-                </View>
-                <View style={styles.insightRight}>
-                  <View style={styles.insightHeaderRow}>
-                    <Text style={styles.insightCategory}>{insight.category}</Text>
-                    <View
-                      style={[
-                        styles.impactBadge,
-                        {
-                          backgroundColor: insight.yearsImpact > 0
-                            ? 'rgba(0, 255, 136, 0.12)'
-                            : 'rgba(255, 68, 68, 0.12)',
-                        },
-                      ]}
-                    >
-                      <Text
+            {prediction.insights.map((insight, index) => {
+              const isPositive = insight.impact === 'positive';
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.insightCard,
+                    isPositive && styles.insightCardPositive,
+                  ]}
+                  onPress={() => navigation.navigate('InsightDetail', { insight })}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.insightLeft,
+                      isPositive && styles.insightLeftPositive,
+                    ]}
+                  >
+                    {isPositive ? (
+                      <Text style={styles.insightCheckmark}>✓</Text>
+                    ) : (
+                      <Text style={styles.insightRoman}>
+                        {ROMAN[index] ?? String(index + 1)}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.insightRight}>
+                    <View style={styles.insightHeaderRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.insightCategory}>{insight.category}</Text>
+                        {isPositive && (
+                          <View style={styles.wellDoneBadge}>
+                            <Text style={styles.wellDoneText}>WELL DONE</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View
                         style={[
-                          styles.impactText,
+                          styles.impactBadge,
                           {
-                            color: insight.yearsImpact > 0
-                              ? theme.colors.success
-                              : theme.colors.danger,
+                            backgroundColor: isPositive
+                              ? 'rgba(0, 255, 136, 0.12)'
+                              : 'rgba(255, 68, 68, 0.12)',
                           },
                         ]}
                       >
-                        {insight.yearsImpact > 0 ? '+' : ''}{insight.yearsImpact}y
-                      </Text>
+                        <Text
+                          style={[
+                            styles.impactText,
+                            {
+                              color: isPositive
+                                ? theme.colors.success
+                                : theme.colors.danger,
+                            },
+                          ]}
+                        >
+                          {insight.yearsImpact > 0 ? '+' : ''}{insight.yearsImpact}y
+                        </Text>
+                      </View>
                     </View>
+                    <Text style={styles.insightTitle}>{insight.title}</Text>
+                    <Text style={styles.insightDesc} numberOfLines={2}>
+                      {insight.description}
+                    </Text>
+                    <Text style={[styles.insightCta, isPositive && styles.insightCtaPositive]}>
+                      {isPositive ? 'Learn why this matters →' : 'Read the prescription →'}
+                    </Text>
                   </View>
-                  <Text style={styles.insightTitle}>{insight.title}</Text>
-                  <Text style={styles.insightDesc} numberOfLines={2}>
-                    {insight.description}
-                  </Text>
-                  <Text style={styles.insightCta}>Read the prescription →</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
-        {/* Ominous disclaimer */}
+        {/* Disclaimer */}
         <View style={styles.disclaimerSection}>
           <Text style={styles.disclaimerSymbol}>⚰️</Text>
           <Text style={styles.disclaimerText}>
@@ -348,21 +373,21 @@ export default function DashboardScreen({ navigation, route }: Props) {
         </View>
       </ScrollView>
 
-      {/* Bottom action bar */}
+      {/* Bottom action bar — text centered in buttons */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.shareBtn}
           onPress={() => navigation.navigate('Share', { prediction })}
           activeOpacity={0.8}
         >
-          <Text style={styles.shareBtnText}>☠  SHARE YOUR FATE</Text>
+          <Text style={styles.shareBtnText}>SHARE YOUR FATE</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.retakeBtn}
           onPress={() => navigation.popToTop()}
           activeOpacity={0.8}
         >
-          <Text style={styles.retakeBtnText}>↺  CHEAT DEATH</Text>
+          <Text style={styles.retakeBtnText}>Reevaluate your fate..</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -385,7 +410,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
   },
-  plagueIcon: { fontSize: 28, marginBottom: theme.spacing.sm },
+  headerImage: {
+    width: 80,
+    height: 80,
+    marginBottom: theme.spacing.sm,
+    opacity: 0.85,
+    borderRadius: 40,
+  },
   headerTitle: {
     fontSize: theme.fontSize.lg,
     color: '#AA3333',
@@ -461,7 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     paddingVertical: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
-    minHeight: 340,
+    minHeight: 360,
     justifyContent: 'space-between',
   },
   cardOrnateTop: {
@@ -476,8 +507,11 @@ const styles = StyleSheet.create({
     height: 1,
     opacity: 0.3,
   },
-  cardTopIcon: {
-    fontSize: 24,
+  cardDoctorImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    opacity: 0.7,
   },
   cardTopLabel: {
     fontSize: 10,
@@ -640,7 +674,12 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
   },
-  insightsIcon: { fontSize: 20 },
+  insightsDoctorImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    opacity: 0.7,
+  },
   insightsTitle: {
     fontSize: theme.fontSize.sm,
     color: '#AA3333',
@@ -653,6 +692,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 1,
   },
+
+  // Insight cards
   insightCard: {
     flexDirection: 'row',
     backgroundColor: '#0A0A10',
@@ -662,17 +703,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1A1A28',
   },
+  insightCardPositive: {
+    borderColor: 'rgba(0, 255, 136, 0.15)',
+    backgroundColor: 'rgba(0, 255, 136, 0.02)',
+  },
   insightLeft: {
     width: 44,
     backgroundColor: 'rgba(170, 51, 51, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  insightLeftPositive: {
+    backgroundColor: 'rgba(0, 255, 136, 0.08)',
+  },
   insightRoman: {
     fontSize: theme.fontSize.sm,
     color: '#AA3333',
     fontWeight: '800',
     fontStyle: 'italic',
+  },
+  insightCheckmark: {
+    fontSize: 18,
+    color: theme.colors.success,
+    fontWeight: '800',
   },
   insightRight: {
     flex: 1,
@@ -688,6 +741,18 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     color: theme.colors.textDim,
     textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  wellDoneBadge: {
+    backgroundColor: 'rgba(0, 255, 136, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: theme.borderRadius.full,
+  },
+  wellDoneText: {
+    fontSize: 9,
+    color: theme.colors.success,
+    fontWeight: '800',
     letterSpacing: 1,
   },
   impactBadge: {
@@ -717,11 +782,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontStyle: 'italic',
   },
+  insightCtaPositive: {
+    color: theme.colors.success,
+  },
 
   // Disclaimer
   disclaimerSection: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.xl,
     gap: theme.spacing.sm,
     backgroundColor: '#0A0608',
@@ -740,7 +807,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  // Bottom bar
+  // Bottom bar — centered text in buttons
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -759,7 +826,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#AA3333',
     borderRadius: theme.borderRadius.full,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   shareBtnText: {
@@ -767,19 +835,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: theme.fontSize.sm,
     letterSpacing: 1,
+    textAlign: 'center',
   },
   retakeBtn: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#331111',
     borderRadius: theme.borderRadius.full,
-    paddingVertical: 14,
+    paddingVertical: 16,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   retakeBtnText: {
     color: theme.colors.textSecondary,
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: theme.fontSize.sm,
-    letterSpacing: 1,
+    textAlign: 'center',
   },
 });
