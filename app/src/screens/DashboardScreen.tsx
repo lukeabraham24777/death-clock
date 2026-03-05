@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Audio } from 'expo-av';
 import { theme } from '../theme';
 import { RootStackParamList } from '../types';
 import CountdownTimer from '../components/CountdownTimer';

@@ -6,7 +6,10 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:docs.expo.dev)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(npx expo install expo-av)",
+      "Bash(python3 -c \":*)",
+      "Bash(python -c \":*)"
     ]
   }
 }
