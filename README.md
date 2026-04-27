@@ -1,3 +1,7 @@
+## Demo
+
+[![Watch Demo](https://img.youtube.com/vi/DtgI_douClg/maxresdefault.jpg)](https://www.youtube.com/shorts/DtgI_douClg)
+
 # Death Clock AI Clone
 
 A viral mobile app that predicts a user's lifespan based on lifestyle data and presents the result in a dramatic, ominous reveal experience. Built with React Native/Expo, featuring a plague doctor theme, live countdown timer, and swipeable result cards.
